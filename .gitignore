@@ -1,0 +1,14 @@
+# Local environment files (Compose interpolation, secrets)
+.env
+.env.local
+.env.*.local
+
+# Logs and database dumps
+*.log
+backups/
+
+# Editor, OS and local tooling state
+.DS_Store
+.idea/
+.vscode/
+.claude/

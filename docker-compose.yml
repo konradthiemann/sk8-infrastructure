@@ -1,0 +1,114 @@
+# Local development stack for the SK8 workspace.
+#
+#   docker compose up -d                        -> PostgreSQL only (default)
+#   docker compose --profile full up -d --build -> PostgreSQL + backend, docs, skate, nutrition, habits
+#
+# Build contexts point at the sibling repositories of the workspace
+# (../sk8-backend etc.). The host port of PostgreSQL can be changed via
+# POSTGRES_PORT in .env (see .env.example).
+
+name: sk8
+
+x-symfony-env: &symfony-env
+  APP_ENV: dev
+  APP_SECRET: dev-secret-change-me
+  # FrankenPHP listens on $PORT (Railway convention); SERVER_NAME mirrors it for Caddy.
+  PORT: "8000"
+  SERVER_NAME: ":8000"
+
+x-frontend-build-args: &frontend-build-args
+  # Vite inlines these at build time; the browser calls the backend on the host.
+  VITE_API_URL: http://localhost:8000
+  VITE_API_KEY: dev-key-change-me
+  VITE_TELEMETRY: "on"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sk8-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sk8
+      POSTGRES_PASSWORD: sk8
+      # sk8_backend is created by the image; sk8_docs, sk8_backend_test and sk8_docs_test by postgres/init.
+      POSTGRES_DB: sk8_backend
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sk8 -d sk8_backend"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  backend:
+    build:
+      context: ../sk8-backend
+    profiles: [full]
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *symfony-env
+      DATABASE_URL: postgresql://sk8:sk8@postgres:5432/sk8_backend?serverVersion=16&charset=utf8
+      APP_API_KEY: dev-key-change-me
+      # Regex allow-list for the three local frontend origins (NelmioCorsBundle). "$$" is a literal "$".
+      CORS_ALLOW_ORIGIN: '^https?://(localhost|127\.0\.0\.1):517[3-5]$$'
+      # Leave empty locally: AI endpoints answer 503, everything else works (ADR-010).
+      ANTHROPIC_API_KEY: ""
+      AI_MODEL_VISION: claude-haiku-4-5
+      AI_MODEL_TEXT: claude-haiku-4-5
+      MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
+      DEFAULT_URI: http://localhost:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  docs:
+    build:
+      context: ../sk8-docs
+    profiles: [full]
+    ports:
+      - "8001:8000"
+    environment:
+      <<: *symfony-env
+      DATABASE_URL: postgresql://sk8:sk8@postgres:5432/sk8_docs?serverVersion=16&charset=utf8
+      DEFAULT_URI: http://localhost:8001
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  skate:
+    build:
+      context: ../sk8-skate
+      args: *frontend-build-args
+    profiles: [full]
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+  nutrition:
+    build:
+      context: ../sk8-nutrition
+      args: *frontend-build-args
+    profiles: [full]
+    ports:
+      - "5174:80"
+    depends_on:
+      - backend
+
+  habits:
+    build:
+      context: ../sk8-habits
+      args: *frontend-build-args
+    profiles: [full]
+    ports:
+      - "5175:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres-data:
