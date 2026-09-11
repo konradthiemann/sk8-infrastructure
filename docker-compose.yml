@@ -47,9 +47,12 @@ services:
   backend:
     build:
       context: ../sk8-backend
+      target: frankenphp_dev
     profiles: [full]
     ports:
       - "8000:8000"
+    volumes:
+      - ../sk8-backend:/app
     environment:
       <<: *symfony-env
       DATABASE_URL: postgresql://sk8:sk8@postgres:5432/sk8_backend?serverVersion=16&charset=utf8
@@ -69,9 +72,12 @@ services:
   docs:
     build:
       context: ../sk8-docs
+      target: frankenphp_dev
     profiles: [full]
     ports:
       - "8001:8000"
+    volumes:
+      - ../sk8-docs:/app
     environment:
       <<: *symfony-env
       DATABASE_URL: postgresql://sk8:sk8@postgres:5432/sk8_docs?serverVersion=16&charset=utf8
