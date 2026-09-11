@@ -5,7 +5,7 @@ SHELL := bash
 COMPOSE := docker compose
 BACKUP_DIR := backups
 
-.PHONY: help up up-full down logs psql psql-docs psql-test db-reset backup setup setup-workspace check
+.PHONY: help up up-full down logs psql psql-docs psql-test db-reset backup setup setup-workspace check smoke
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -51,3 +51,6 @@ setup-workspace: ## Clone missing sk8-* repositories and activate their hooks
 
 check: ## Run the same validations as CI (compose config, bash -n, shellcheck)
 	@scripts/check.sh
+
+smoke: ## Run scripts/railway-smoke.sh against SK8_*_URL (defaults: local compose)
+	@scripts/railway-smoke.sh
